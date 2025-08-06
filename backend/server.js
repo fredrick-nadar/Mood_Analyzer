@@ -275,6 +275,195 @@ app.delete('/api/mood/entry/:date', authenticateToken, async (req, res) => {
   }
 });
 
+// Frontend-compatible routes (using /route prefix)
+// These are duplicates of the /api routes above to match frontend calls
+
+// Save mood entry (frontend version)
+app.post('/route/mood/entry', authenticateToken, async (req, res) => {
+  try {
+    const { mood, description, sleepHours, exerciseMinutes, stressLevel, date } = req.body;
+    
+    // Validation
+    if (!mood || mood < 1 || mood > 5) {
+      return res.status(400).json({ error: 'Valid mood (1-5) is required' });
+    }
+    
+    if (!date) {
+      return res.status(400).json({ error: 'Date is required' });
+    }
+    
+    const moodData = {
+      userId: req.userId,
+      date: date,
+      mood: parseInt(mood),
+      description: description || '',
+      sleepHours: parseFloat(sleepHours) || 0,
+      exerciseMinutes: parseInt(exerciseMinutes) || 0,
+      stressLevel: parseInt(stressLevel) || 5,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+    // Use userId_date as document ID to prevent duplicates
+    const docId = `${req.userId}_${date}`;
+    await db.collection('moods').doc(docId).set(moodData);
+    
+    // Update user stats
+    await updateUserStats(req.userId, date);
+    
+    res.json({ message: 'Mood entry saved successfully', data: moodData });
+  } catch (error) {
+    console.error('Error saving mood entry:', error);
+    res.status(500).json({ error: 'Failed to save mood entry' });
+  }
+});
+
+// Get mood entries (frontend version)
+app.get('/route/mood/entries', authenticateToken, async (req, res) => {
+  try {
+    const { limit = 30, startDate, endDate } = req.query;
+    
+    console.log(`Fetching mood entries for user ${req.userId}, limit: ${limit}`);
+    
+    const snapshot = await db.collection('moods')
+      .where('userId', '==', req.userId)
+      .get();
+    
+    let entries = [];
+    
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      // Apply client-side filtering
+      if (startDate && data.date < startDate) return;
+      if (endDate && data.date > endDate) return;
+      
+      entries.push({ id: doc.id, ...data });
+    });
+    
+    // Sort by date descending and limit on client side
+    entries.sort((a, b) => b.date.localeCompare(a.date));
+    entries = entries.slice(0, parseInt(limit));
+    
+    console.log(`Found ${entries.length} mood entries`);
+    
+    res.json(entries);
+  } catch (error) {
+    console.error('Error getting mood entries:', error);
+    console.error('Error details:', error.stack);
+    res.status(500).json({ error: 'Failed to get mood entries', details: error.message });
+  }
+});
+
+// Get monthly analysis (frontend version)
+app.get('/route/mood/analysis/:year/:month', authenticateToken, async (req, res) => {
+  try {
+    const { year, month } = req.params;
+    const startDate = `${year}-${month.padStart(2, '0')}-01`;
+    const endDate = `${year}-${month.padStart(2, '0')}-31`;
+    
+    console.log(`Fetching mood analysis for user ${req.userId} from ${startDate} to ${endDate}`);
+    
+    const snapshot = await db.collection('moods')
+      .where('userId', '==', req.userId)
+      .get();
+    
+    const entries = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      // Client-side date filtering
+      if (data.date >= startDate && data.date <= endDate) {
+        entries.push(data);
+      }
+    });
+    
+    // Client-side sorting
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+    
+    console.log(`Found ${entries.length} entries for analysis`);
+    
+    if (entries.length === 0) {
+      return res.json({ message: 'No data available for this month' });
+    }
+    
+    // Calculate statistics
+    const analysis = calculateMoodAnalysis(entries);
+    
+    // Generate recommendations
+    const recommendations = generateRecommendations(analysis, entries);
+    
+    res.json({
+      period: `${year}-${month}`,
+      totalEntries: entries.length,
+      analysis,
+      recommendations,
+      chartData: entries.map(entry => ({
+        date: entry.date,
+        mood: entry.mood,
+        stressLevel: entry.stressLevel
+      }))
+    });
+  } catch (error) {
+    console.error('Error getting monthly analysis:', error);
+    console.error('Error details:', error.stack);
+    res.status(500).json({ error: 'Failed to get monthly analysis', details: error.message });
+  }
+});
+
+// Get mood trends (frontend version)
+app.get('/route/mood/trends', authenticateToken, async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+    const startDateStr = startDate.toISOString().split('T')[0];
+    
+    console.log(`Fetching mood trends for user ${req.userId}, last ${days} days from ${startDateStr}`);
+    
+    const snapshot = await db.collection('moods')
+      .where('userId', '==', req.userId)
+      .get();
+    
+    const entries = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      // Client-side date filtering
+      if (data.date >= startDateStr) {
+        entries.push(data);
+      }
+    });
+    
+    // Client-side sorting
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+    
+    console.log(`Found ${entries.length} entries for trends analysis`);
+    
+    const trends = calculateTrends(entries);
+    
+    res.json({
+      period: `Last ${days} days`,
+      trends,
+      entries: entries.length
+    });
+  } catch (error) {
+    console.error('Error getting mood trends:', error);
+    console.error('Error details:', error.stack);
+    res.status(500).json({ error: 'Failed to get mood trends', details: error.message });
+  }
+});
+
+// Delete mood entry (frontend version)
+app.delete('/route/mood/entry/:date', authenticateToken, async (req, res) => {
+  try {
+    const { date } = req.params;
+    const docId = `${req.userId}_${date}`;
+    
+    await db.collection('moods').doc(docId).delete();
+    res.json({ message: 'Mood entry deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting mood entry:', error);
+    res.status(500).json({ error: 'Failed to delete mood entry' });
+  }
+});
+
 // Helper functions
 
 async function updateUserStats(userId, lastEntryDate) {
