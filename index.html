@@ -833,6 +833,7 @@
     <!-- Firebase SDK -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 
     <script>
@@ -847,25 +848,20 @@
   measurementId: "G-KGT01GHHPL"
 };
 
-
-        // API Base URL - Update for production
-        const API_BASE_URL = 'https://mood-analyzer-backend.onrender.com/route';
-
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
+        const db = firebase.firestore();
 
         // Global variables
         let currentUser = null;
         let selectedMood = null;
         let moodChart = null;
-        let authToken = null;
 
         // Authentication state observer
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 currentUser = user;
-                authToken = await user.getIdToken();
                 
                 document.getElementById('authSection').classList.remove('active');
                 document.getElementById('appSection').classList.add('active');
@@ -878,46 +874,79 @@
                 loadMoodTrends();
             } else {
                 currentUser = null;
-                authToken = null;
                 document.getElementById('appSection').classList.remove('active');
                 document.getElementById('authSection').classList.add('active');
             }
         });
 
-        // API Helper function
-        async function apiCall(endpoint, method = 'GET', data = null) {
-            if (!authToken) {
-                throw new Error('User not authenticated');
-            }
-
-            const options = {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                }
+        // Firestore Helper Functions
+        async function saveMoodToFirestore(moodData) {
+            if (!currentUser) throw new Error('User not authenticated');
+            
+            const docId = `${currentUser.uid}_${moodData.date}`;
+            const moodEntry = {
+                userId: currentUser.uid,
+                date: moodData.date,
+                mood: parseInt(moodData.mood),
+                description: moodData.description || '',
+                sleepHours: parseFloat(moodData.sleepHours) || 0,
+                exerciseMinutes: parseInt(moodData.exerciseMinutes) || 0,
+                stressLevel: parseInt(moodData.stressLevel) || 5,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
             };
+            
+            await db.collection('moods').doc(docId).set(moodEntry);
+            await updateUserStats(currentUser.uid, moodData.date);
+            return moodEntry;
+        }
 
-            if (data && (method === 'POST' || method === 'PUT')) {
-                options.body = JSON.stringify(data);
-            }
+        async function getMoodEntriesFromFirestore(limit = 30, startDate = null, endDate = null) {
+            if (!currentUser) throw new Error('User not authenticated');
+            
+            const snapshot = await db.collection('moods')
+                .where('userId', '==', currentUser.uid)
+                .get();
+            
+            let entries = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                // Apply client-side filtering
+                if (startDate && data.date < startDate) return;
+                if (endDate && data.date > endDate) return;
+                
+                entries.push({ id: doc.id, ...data });
+            });
+            
+            // Sort by date descending and limit on client side
+            entries.sort((a, b) => b.date.localeCompare(a.date));
+            entries = entries.slice(0, parseInt(limit));
+            
+            return entries;
+        }
 
+        async function deleteMoodFromFirestore(date) {
+            if (!currentUser) throw new Error('User not authenticated');
+            
+            const docId = `${currentUser.uid}_${date}`;
+            await db.collection('moods').doc(docId).delete();
+        }
+
+        async function updateUserStats(userId, lastEntryDate) {
+            const userRef = db.collection('users').doc(userId);
+            
             try {
-                console.log(`Making API call to: ${API_BASE_URL}${endpoint}`);
-                const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('API Error Response:', errorText);
-                    throw new Error(`HTTP ${response.status}: ${errorText}`);
-                }
-                
-                const result = await response.json();
-                console.log('API Success:', result);
-                return result;
+                await userRef.update({
+                    lastEntry: lastEntryDate,
+                    totalEntries: firebase.firestore.FieldValue.increment(1)
+                });
             } catch (error) {
-                console.error('API Error:', error);
-                throw error;
+                // If user document doesn't exist, create it
+                await userRef.set({
+                    email: currentUser.email,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    totalEntries: 1,
+                    lastEntry: lastEntryDate
+                });
             }
         }
 
@@ -1035,7 +1064,7 @@
             const selectedDate = document.getElementById('entryDate').value || new Date().toISOString().split('T')[0];
             
             try {
-                const entries = await apiCall(`/mood/entries?startDate=${selectedDate}&endDate=${selectedDate}&limit=1`);
+                const entries = await getMoodEntriesFromFirestore(1, selectedDate, selectedDate);
                 
                 if (entries.length > 0) {
                     const entry = entries[0];
@@ -1077,7 +1106,7 @@
             };
 
             try {
-                await apiCall('/mood/entry', 'POST', moodData);
+                await saveMoodToFirestore(moodData);
                 showMessage('entryMessage', `Mood saved successfully for ${formatDate(selectedDate)}!`, 'success');
                 
                 // Reset form
@@ -1128,9 +1157,36 @@ async function loadMonthlyAnalysis() {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1; // getMonth() returns 0-11
+        const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+        const endDate = `${year}-${month.toString().padStart(2, '0')}-31`;
         
         console.log(`Loading analysis for ${year}/${month}`);
-        const response = await apiCall(`/mood/analysis/${year}/${month}`);
+        
+        // Get entries for the month
+        const entries = await getMoodEntriesFromFirestore(100, startDate, endDate);
+        
+        if (entries.length === 0) {
+            displayAnalysis({ message: 'No data available for this month' });
+            return;
+        }
+        
+        // Calculate statistics
+        const analysis = calculateMoodAnalysis(entries);
+        
+        // Generate recommendations
+        const recommendations = generateRecommendations(analysis, entries);
+        
+        const response = {
+            period: `${year}-${month}`,
+            totalEntries: entries.length,
+            analysis,
+            recommendations,
+            chartData: entries.map(entry => ({
+                date: entry.date,
+                mood: entry.mood,
+                stressLevel: entry.stressLevel
+            }))
+        };
         
         displayAnalysis(response);
     } catch (error) {
@@ -1247,9 +1303,9 @@ function displayAnalysis(data) {
 async function loadMoodHistory() {
     try {
         console.log('Loading mood history...');
-        const response = await apiCall('/mood/entries?limit=50');
+        const entries = await getMoodEntriesFromFirestore(50);
         
-        displayMoodHistory(response);
+        displayMoodHistory(entries);
     } catch (error) {
         console.error('Error loading mood history:', error);
         const historyTab = document.getElementById('historyTab');
@@ -1285,12 +1341,12 @@ function displayMoodHistory(entries) {
         <div class="history-list">
             ${entries.map(entry => `
                 <div class="history-item">
-                    <div class="history-date">${formatDate(entry.date)}</div>
-                    <div class="history-mood">
-                        <span class="mood-emoji">${getMoodEmoji(entry.mood)}</span>
-                        <span class="mood-text">${getMoodText(entry.mood)}</span>
-                    </div>
                     <div class="history-details">
+                        <div class="history-date">${formatDate(entry.date)}</div>
+                        <div class="history-mood">
+                            <span class="mood-emoji">${getMoodEmoji(entry.mood)}</span>
+                            <span class="mood-text">${getMoodText(entry.mood)}</span>
+                        </div>
                         ${entry.description ? `<p><strong>Note:</strong> ${entry.description}</p>` : ''}
                         <div class="mini-stats">
                             <span>💤 ${entry.sleepHours}h</span>
@@ -1309,7 +1365,20 @@ function displayMoodHistory(entries) {
 async function loadMoodTrends() {
     try {
         console.log('Loading mood trends...');
-        const response = await apiCall('/mood/trends?days=30');
+        const days = 30;
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        const startDateStr = startDate.toISOString().split('T')[0];
+        
+        const entries = await getMoodEntriesFromFirestore(100, startDateStr);
+        
+        const trends = calculateTrends(entries);
+        
+        const response = {
+            period: `Last ${days} days`,
+            trends,
+            entries: entries.length
+        };
         
         displayMoodTrends(response);
     } catch (error) {
@@ -1424,7 +1493,7 @@ async function deleteMoodEntry(date) {
     if (!confirm('Are you sure you want to delete this mood entry?')) return;
     
     try {
-        await apiCall(`/mood/entry/${date}`, 'DELETE');
+        await deleteMoodFromFirestore(date);
         loadMoodHistory(); // Refresh the list
         showMessage('historyMessage', 'Mood entry deleted successfully!', 'success');
     } catch (error) {
@@ -1432,12 +1501,121 @@ async function deleteMoodEntry(date) {
     }
 }
 
+// Analysis and calculation functions
+function calculateMoodAnalysis(entries) {
+    if (entries.length === 0) return null;
+    
+    const moods = entries.map(e => e.mood);
+    const sleepHours = entries.map(e => e.sleepHours || 0);
+    const exerciseMinutes = entries.map(e => e.exerciseMinutes || 0);
+    const stressLevels = entries.map(e => e.stressLevel || 5);
+    
+    return {
+        averageMood: (moods.reduce((a, b) => a + b, 0) / moods.length).toFixed(2),
+        averageSleep: (sleepHours.reduce((a, b) => a + b, 0) / sleepHours.length).toFixed(2),
+        averageExercise: Math.round(exerciseMinutes.reduce((a, b) => a + b, 0) / exerciseMinutes.length),
+        averageStress: (stressLevels.reduce((a, b) => a + b, 0) / stressLevels.length).toFixed(2),
+        moodDistribution: {
+            veryHappy: moods.filter(m => m === 5).length,
+            happy: moods.filter(m => m === 4).length,
+            neutral: moods.filter(m => m === 3).length,
+            sad: moods.filter(m => m === 2).length,
+            verySad: moods.filter(m => m === 1).length
+        },
+        bestDay: entries.find(e => e.mood === Math.max(...moods)),
+        worstDay: entries.find(e => e.mood === Math.min(...moods))
+    };
+}
+
+function generateRecommendations(analysis, entries) {
+    const recommendations = [];
+    
+    if (!analysis) return recommendations;
+    
+    // Mood recommendations
+    if (parseFloat(analysis.averageMood) < 3) {
+        recommendations.push({
+            category: 'Mood Improvement',
+            priority: 'high',
+            title: 'Focus on Mental Wellness',
+            description: 'Your average mood has been below neutral. Consider speaking with a mental health professional, practicing daily mindfulness, or engaging in activities that bring you joy.',
+            actionItems: ['Schedule a session with a therapist', 'Try 10 minutes of daily meditation', 'Engage in a hobby you love']
+        });
+    }
+    
+    // Sleep recommendations
+    if (parseFloat(analysis.averageSleep) < 7) {
+        recommendations.push({
+            category: 'Sleep Optimization',
+            priority: 'high',
+            title: 'Improve Sleep Quality',
+            description: `Your average sleep is ${analysis.averageSleep} hours. Aim for 7-9 hours of quality sleep nightly.`,
+            actionItems: ['Set a consistent bedtime', 'Create a relaxing bedtime routine', 'Limit screen time before bed']
+        });
+    }
+    
+    // Exercise recommendations
+    if (parseInt(analysis.averageExercise) < 30) {
+        recommendations.push({
+            category: 'Physical Activity',
+            priority: 'medium',
+            title: 'Increase Daily Movement',
+            description: `You're averaging ${analysis.averageExercise} minutes of exercise. Regular physical activity can significantly improve mood.`,
+            actionItems: ['Take daily 15-minute walks', 'Try bodyweight exercises', 'Find a physical activity you enjoy']
+        });
+    }
+    
+    // Stress management
+    if (parseFloat(analysis.averageStress) > 6) {
+        recommendations.push({
+            category: 'Stress Management',
+            priority: 'high',
+            title: 'Reduce Stress Levels',
+            description: 'Your stress levels are consistently elevated. Learning stress management techniques is crucial for overall well-being.',
+            actionItems: ['Practice deep breathing exercises', 'Try progressive muscle relaxation', 'Consider yoga or tai chi']
+        });
+    }
+    
+    // Positive reinforcement
+    if (parseFloat(analysis.averageMood) >= 4) {
+        recommendations.push({
+            category: 'Maintain Wellness',
+            priority: 'low',
+            title: 'Keep Up the Great Work!',
+            description: 'Your mood has been consistently positive. Continue with your current healthy habits!',
+            actionItems: ['Maintain your current routine', 'Share your success strategies', 'Help others on their wellness journey']
+        });
+    }
+    
+    return recommendations;
+}
+
+function calculateTrends(entries) {
+    if (entries.length < 2) return null;
+    
+    const recentEntries = entries.slice(-7); // Last 7 days
+    const olderEntries = entries.slice(-14, -7); // Previous 7 days
+    
+    if (recentEntries.length === 0 || olderEntries.length === 0) return null;
+    
+    const recentAvg = recentEntries.reduce((a, b) => a + b.mood, 0) / recentEntries.length;
+    const olderAvg = olderEntries.reduce((a, b) => a + b.mood, 0) / olderEntries.length;
+    
+    const moodTrend = recentAvg > olderAvg ? 'improving' : recentAvg < olderAvg ? 'declining' : 'stable';
+    
+    return {
+        moodTrend,
+        recentAverage: recentAvg.toFixed(2),
+        previousAverage: olderAvg.toFixed(2),
+        changePercentage: (((recentAvg - olderAvg) / olderAvg) * 100).toFixed(1)
+    };
+}
+
 // Also call these functions when user signs in
 // Update your auth state observer:
 auth.onAuthStateChanged(async (user) => {
     if (user) {
         currentUser = user;
-        authToken = await user.getIdToken();
         
         checkTodayEntry();
         // Load initial data
@@ -1446,7 +1624,6 @@ auth.onAuthStateChanged(async (user) => {
         loadMoodTrends();
     } else {
         currentUser = null;
-        authToken = null;
         document.getElementById('authSection').style.display = 'block';
         document.getElementById('appSection').style.display = 'none';
     }

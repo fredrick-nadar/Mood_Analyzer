@@ -1,6 +1,7 @@
-node_modules/
-
-.env
-dist/
+# OS and Editor files
 .DS_Store
 *.log
+Thumbs.db
+
+# Development
+dist/
