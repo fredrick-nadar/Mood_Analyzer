@@ -21,13 +21,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors({
-  origin: 'https://mood-analyze.netlify.app',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true
-}));
+app.use(cors());
 app.use(express.json());
-// app.use(express.static('static'));
+app.use(express.static('static'));
 
 // Initialize Firebase Admin SDK
 
