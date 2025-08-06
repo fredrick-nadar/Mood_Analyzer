@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MonthWise - Daily Mood Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: #34495e;
+            margin-bottom: 40px;
+            padding: 30px 0;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c5aa0;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #5a6c7d;
+            font-weight: 400;
+        }
+
+        .main-content {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .auth-section, .app-section {
+            display: none;
+        }
+
+        .auth-section.active, .app-section.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #4a5568;
+            font-size: 14px;
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            background: #fff;
+        }
+
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none;
+            border-color: #63b3ed;
+            box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin: 5px;
+            text-transform: none;
+            box-shadow: 0 2px 4px rgba(66, 153, 225, 0.2);
+        }
+
+        .btn:hover {
+            background: linear-gradient(135deg, #3182ce 0%, #2c5282 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(66, 153, 225, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #68d391 0%, #48bb78 100%);
+            box-shadow: 0 2px 4px rgba(104, 211, 145, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(104, 211, 145, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #a0aec0;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .mood-scale {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .mood-option {
+            text-align: center;
+            cursor: pointer;
+            padding: 16px 12px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            border: 2px solid #e2e8f0;
+            background: linear-gradient(135deg, #fff 0%, #f7fafc 100%);
+            font-size: 14px;
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        .mood-option:hover {
+            border-color: #63b3ed;
+            background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 179, 237, 0.2);
+        }
+
+        .mood-option.selected {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            border-color: #3182ce;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(66, 153, 225, 0.3);
+        }
+
+        .chart-container {
+            margin: 32px 0;
+            padding: 24px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-radius: 12px;
+            border: 1px solid #bae6fd;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #cbd5e0;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 8px 8px 0 0;
+            padding: 0;
+        }
+
+        .tab {
+            padding: 16px 24px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            background: transparent;
+            color: #718096;
+            font-weight: 500;
+            font-size: 14px;
+            flex: 1;
+            text-align: center;
+        }
+
+        .tab:hover {
+            background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
+            color: #2b6cb0;
+        }
+
+        .tab.active {
+            border-bottom-color: #4299e1;
+            color: #2b6cb0;
+            background: linear-gradient(135deg, #fff 0%, #f0f9ff 100%);
+        }
+
+        .tab-content {
+            display: none;
+            padding: 24px 0;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .mood-history {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 32px 28px;
+            margin-top: 36px;
+        }
+
+        .mood-entry {
+            background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+            padding: 28px 24px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.07);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin-bottom: 8px;
+        }
+
+        .mood-entry:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.13);
+        }
+
+        .mood-entry-date {
+            font-weight: 600;
+            color: #2b6cb0;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .mood-entry-score {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: #2d3748;
+        }
+
+        .recommendations {
+            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+            padding: 24px;
+            border-radius: 12px;
+            margin-top: 24px;
+            border: 1px solid #9ae6b4;
+        }
+
+        .recommendations h3 {
+            color: #276749;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .recommendation-item {
+            background: linear-gradient(135deg, #fff 0%, #f0fff4 100%);
+            padding: 20px;
+            margin: 12px 0;
+            border-radius: 12px;
+            border-left: 4px solid #48bb78;
+            box-shadow: 0 2px 8px rgba(72, 187, 120, 0.1);
+        }
+
+        .recommendation-item.high-priority {
+            border-left-color: #f56565;
+            background: linear-gradient(135deg, #fff 0%, #fed7d7 100%);
+            box-shadow: 0 2px 8px rgba(245, 101, 101, 0.1);
+        }
+
+        .recommendation-item.medium-priority {
+            border-left-color: #ed8936;
+            background: linear-gradient(135deg, #fff 0%, #feebc8 100%);
+            box-shadow: 0 2px 8px rgba(237, 137, 54, 0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 24px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #fff 0%, #f7fafc 100%);
+            padding: 24px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2b6cb0;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            color: #718096;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .spinner {
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #4299e1;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding: 20px;
+            background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
+            border-radius: 12px;
+            border: 1px solid #90cdf4;
+        }
+
+        .user-info h2 {
+            color: #2b6cb0;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .alert {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 12px 0;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+            border: 1px solid #9ae6b4;
+            color: #276749;
+        }
+
+        .alert-error {
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+            border: 1px solid #fc8181;
+            color: #742a2a;
+        }
+
+        .trend-indicator {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 8px;
+        }
+
+        .trend-up {
+            color: #38a169;
+        }
+
+        .trend-down {
+            color: #e53e3e;
+        }
+
+        .trend-stable {
+            color: #dd6b20;
+        }
+
+        .error-message, .no-data-message {
+            text-align: center;
+            padding: 48px 24px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 12px;
+            margin: 24px 0;
+            border: 1px solid #cbd5e0;
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+            border: 1px solid #fc8181;
+            color: #742a2a;
+        }
+
+        .error-message h3 {
+            color: #742a2a;
+            margin-bottom: 12px;
+            font-size: 1.2rem;
+        }
+
+        .no-data-message {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1px solid #7dd3fc;
+            color: #0c4a6e;
+        }
+
+        .no-data-message h3 {
+            color: #0369a1;
+            margin-bottom: 12px;
+            font-size: 1.2rem;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .history-item {
+            background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .history-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+
+        .history-date {
+            font-weight: 600;
+            color: #2b6cb0;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .history-mood {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .mood-emoji {
+            font-size: 1.5rem;
+        }
+
+        .mood-text {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .history-details {
+            flex-grow: 1;
+        }
+
+        .mini-stats {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .mini-stats span {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #0369a1;
+            border: 1px solid #7dd3fc;
+        }
+
+        .delete-btn {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(245, 101, 101, 0.2);
+        }
+
+        .delete-btn:hover {
+            background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(245, 101, 101, 0.3);
+        }
+
+        .mood-distribution {
+            margin: 32px 0;
+        }
+
+        .distribution-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .bar-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .bar-item span:first-child {
+            width: 80px;
+            font-size: 14px;
+            color: #2d3748;
+            font-weight: 500;
+        }
+
+        .bar {
+            flex-grow: 1;
+            height: 24px;
+            background: #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bar .fill {
+            height: 100%;
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            transition: width 0.3s ease;
+        }
+
+        .recommendation-card {
+            background: linear-gradient(135deg, #fff 0%, #f0fff4 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+            border-left: 4px solid #48bb78;
+            box-shadow: 0 4px 6px rgba(72, 187, 120, 0.1);
+        }
+
+        .recommendation-card.priority-high {
+            border-left-color: #f56565;
+            background: linear-gradient(135deg, #fff 0%, #fff5f5 100%);
+            box-shadow: 0 4px 6px rgba(245, 101, 101, 0.1);
+        }
+
+        .recommendation-card.priority-medium {
+            border-left-color: #ed8936;
+            background: linear-gradient(135deg, #fff 0%, #fffaf0 100%);
+            box-shadow: 0 4px 6px rgba(237, 137, 54, 0.1);
+        }
+
+        .recommendation-card.priority-low {
+            border-left-color: #48bb78;
+            background: linear-gradient(135deg, #fff 0%, #f0fff4 100%);
+            box-shadow: 0 4px 6px rgba(72, 187, 120, 0.1);
+        }
+
+        .recommendation-card h4 {
+            margin-bottom: 8px;
+            color: #2d3748;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .recommendation-card .category {
+            font-size: 13px;
+            color: #718096;
+            font-weight: 600;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .recommendation-card ul {
+            margin-top: 16px;
+            padding-left: 20px;
+        }
+
+        .recommendation-card li {
+            margin: 6px 0;
+            color: #4a5568;
+        }
+
+        .trend-summary {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+        }
+
+        .trend-card {
+            background: linear-gradient(135deg, #fff 0%, #f0f9ff 100%);
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(66, 153, 225, 0.1);
+            border: 1px solid #bae6fd;
+            max-width: 400px;
+        }
+
+        .trend-value {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #2b6cb0;
+            margin: 16px 0;
+            text-transform: capitalize;
+        }
+
+        .trend-period {
+            text-align: center;
+            color: #718096;
+            margin-top: 20px;
+            font-style: italic;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .mood-scale {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+            }
+            
+            .mood-option {
+                margin: 4px 0;
+                padding: 12px 8px;
+                font-size: 13px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .tabs {
+                flex-wrap: wrap;
+            }
+
+            .tab {
+                flex: none;
+                min-width: 120px;
+            }
+
+            .container {
+                padding: 12px;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 Month in Memory</h1>
+            <p>Track your daily moods and discover insights for better mental health</p>
+        </div>
+
+        <!-- Authentication Section -->
+        <div class="main-content auth-section active" id="authSection">
+            <h2>Welcome to MoodTracker</h2>
+            <p>Please sign in to start tracking your mood journey</p>
+            
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" placeholder="Enter your email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" placeholder="Enter your password" required>
+            </div>
+            
+            <button class="btn" id="signInBtn" onclick="signIn()">Sign In</button>
+            <button class="btn btn-secondary" id="signUpBtn" onclick="signUp()">Sign Up</button>
+            
+            <div id="authMessage" class="alert" style="display: none;"></div>
+        </div>
+
+        <!-- Main Application Section -->
+        <div class="main-content app-section" id="appSection">
+            <div class="user-info">
+                <h2>Welcome back, <span id="userEmail"></span>!</h2>
+                <button class="btn btn-secondary" onclick="signOut()">Sign Out</button>
+            </div>
+
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('entry')">Daily Entry</div>
+                <div class="tab" onclick="showTab('analysis')">Monthly Analysis</div>
+                <div class="tab" onclick="showTab('history')">Mood History</div>
+                <div class="tab" onclick="showTab('trends')">Trends</div>
+            </div>
+
+            <!-- Daily Entry Tab -->
+            <div class="tab-content active" id="entryTab">
+                <h3>How are you feeling today?</h3>
+                
+                <!-- Date Picker for Testing -->
+                <div class="form-group">
+                    <label for="entryDate">Date (for testing - you can pick any date):</label>
+                    <input type="date" id="entryDate" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Mood Scale (1-5):</label>
+                    <div class="mood-scale">
+                        <div class="mood-option mood-1" onclick="selectMood(1)">
+                            <div style="font-size: 2rem;">😢</div>
+                            <div>Very Sad</div>
+                        </div>
+                        <div class="mood-option mood-2" onclick="selectMood(2)">
+                            <div style="font-size: 2rem;">😕</div>
+                            <div>Sad</div>
+                        </div>
+                        <div class="mood-option mood-3" onclick="selectMood(3)">
+                            <div style="font-size: 2rem;">😐</div>
+                            <div>Neutral</div>
+                        </div>
+                        <div class="mood-option mood-4" onclick="selectMood(4)">
+                            <div style="font-size: 2rem;">😊</div>
+                            <div>Happy</div>
+                        </div>
+                        <div class="mood-option mood-5" onclick="selectMood(5)">
+                            <div style="font-size: 2rem;">😄</div>
+                            <div>Very Happy</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="moodDescription">What happened today? How are you feeling?</label>
+                    <textarea id="moodDescription" rows="4" placeholder="Describe your day, events, thoughts, or feelings..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="sleepHours">Hours of sleep:</label>
+                    <input type="number" id="sleepHours" min="0" max="24" step="0.5" placeholder="8">
+                </div>
+
+                <div class="form-group">
+                    <label for="exerciseMinutes">Exercise minutes:</label>
+                    <input type="number" id="exerciseMinutes" min="0" placeholder="30">
+                </div>
+
+                <div class="form-group">
+                    <label for="stressLevel">Stress Level (1-10):</label>
+                    <select id="stressLevel">
+                        <option value="">Select stress level</option>
+                        <option value="1">1 - No stress</option>
+                        <option value="2">2 - Very low</option>
+                        <option value="3">3 - Low</option>
+                        <option value="4">4 - Mild</option>
+                        <option value="5">5 - Moderate</option>
+                        <option value="6">6 - Somewhat high</option>
+                        <option value="7">7 - High</option>
+                        <option value="8">8 - Very high</option>
+                        <option value="9">9 - Extremely high</option>
+                        <option value="10">10 - Maximum stress</option>
+                    </select>
+                </div>
+
+                <button class="btn" id="saveMoodBtn" onclick="saveMoodEntry()">Save Mood Entry</button>
+                <div id="entryMessage" class="alert" style="display: none;"></div>
+            </div>
+
+            <!-- Analysis Tab -->
+            <div class="tab-content" id="analysisTab">
+                <h3>Monthly Mood Analysis</h3>
+                
+                <div class="stats-grid" id="statsGrid">
+                    <!-- Stats will be loaded here -->
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="moodChart" width="400" height="200"></canvas>
+                </div>
+                
+                <div class="recommendations" id="recommendations">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Analyzing your mood patterns...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Tab -->
+            <div class="tab-content" id="historyTab">
+                <h3>Your Mood Journey</h3>
+                <div style="margin-bottom: 18px;"></div>
+                <div class="mood-history" id="moodHistory">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading your mood history...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trends Tab -->
+            <div class="tab-content" id="trendsTab">
+                <h3>Mood Trends & Insights</h3>
+                <div id="trendsContent">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Calculating trends...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+    <script>
+        // Configuration - Replace with your actual Firebase config
+        const firebaseConfig = {
+  apiKey: "AIzaSyBwpJyks7tkEjn8FD3X7wQFkvK25UC4Dts",
+  authDomain: "mood-analyzer-e1b67.firebaseapp.com",
+  projectId: "mood-analyzer-e1b67",
+  storageBucket: "mood-analyzer-e1b67.appspot.com",
+  messagingSenderId: "302363540368",
+  appId: "1:302363540368:web:a219e7b9e89a59e4525115",
+  measurementId: "G-KGT01GHHPL"
+};
+
+
+        // API Base URL - Update for production
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // Global variables
+        let currentUser = null;
+        let selectedMood = null;
+        let moodChart = null;
+        let authToken = null;
+
+        // Authentication state observer
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                currentUser = user;
+                authToken = await user.getIdToken();
+                
+                document.getElementById('authSection').classList.remove('active');
+                document.getElementById('appSection').classList.add('active');
+                document.getElementById('userEmail').textContent = user.email;
+                
+                checkTodayEntry();
+                // Load initial data
+                loadMonthlyAnalysis();
+                loadMoodHistory();
+                loadMoodTrends();
+            } else {
+                currentUser = null;
+                authToken = null;
+                document.getElementById('appSection').classList.remove('active');
+                document.getElementById('authSection').classList.add('active');
+            }
+        });
+
+        // API Helper function
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            if (!authToken) {
+                throw new Error('User not authenticated');
+            }
+
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                }
+            };
+
+            if (data && (method === 'POST' || method === 'PUT')) {
+                options.body = JSON.stringify(data);
+            }
+
+            try {
+                console.log(`Making API call to: ${API_BASE_URL}${endpoint}`);
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error Response:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const result = await response.json();
+                console.log('API Success:', result);
+                return result;
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+
+        // Authentication functions
+        async function signUp() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showMessage('authMessage', 'Please enter both email and password', 'error');
+                return;
+            }
+
+            setButtonLoading('signUpBtn', true);
+            
+            try {
+                await auth.createUserWithEmailAndPassword(email, password);
+                showMessage('authMessage', 'Account created successfully!', 'success');
+            } catch (error) {
+                showMessage('authMessage', error.message, 'error');
+            } finally {
+                setButtonLoading('signUpBtn', false);
+            }
+        }
+
+        async function signIn() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showMessage('authMessage', 'Please enter both email and password', 'error');
+                return;
+            }
+
+            setButtonLoading('signInBtn', true);
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (error) {
+                showMessage('authMessage', error.message, 'error');
+            } finally {
+                setButtonLoading('signInBtn', false);
+            }
+        }
+
+        function signOut() {
+            auth.signOut();
+        }
+
+        // UI Helper functions
+        function setButtonLoading(buttonId, loading) {
+            const button = document.getElementById(buttonId);
+            button.disabled = loading;
+            if (loading) {
+                button.textContent = 'Loading...';
+            } else {
+                button.textContent = buttonId === 'signInBtn' ? 'Sign In' : 'Sign Up';
+            }
+        }
+
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            
+            // Remove active class from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Show selected tab
+            const selectedTab = document.getElementById(tabName + 'Tab');
+            if (selectedTab) {
+                selectedTab.style.display = 'block';
+            }
+            
+            // Add active class to clicked nav item
+            const navItem = document.querySelector(`[onclick="showTab('${tabName}')"]`);
+            if (navItem) {
+                navItem.classList.add('active');
+            }
+            
+            // Load data based on tab
+            if (tabName === 'analysis') {
+                loadMonthlyAnalysis();
+            } else if (tabName === 'history') {
+                loadMoodHistory();
+            } else if (tabName === 'trends') {
+                loadMoodTrends();
+            }
+        }
+
+        function selectMood(mood) {
+            selectedMood = mood;
+            document.querySelectorAll('.mood-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            event.target.closest('.mood-option').classList.add('selected');
+        }
+
+        function showMessage(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `alert alert-${type}`;
+            element.style.display = 'block';
+            
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 5000);
+        }
+
+        // Mood tracking functions
+        async function checkTodayEntry() {
+            const selectedDate = document.getElementById('entryDate').value || new Date().toISOString().split('T')[0];
+            
+            try {
+                const entries = await apiCall(`/mood/entries?startDate=${selectedDate}&endDate=${selectedDate}&limit=1`);
+                
+                if (entries.length > 0) {
+                    const entry = entries[0];
+                    showMessage('entryMessage', `You have already logged your mood for ${formatDate(selectedDate)}!`, 'success');
+                    
+                    // Pre-fill form with the entry for this date
+                    selectMood(entry.mood);
+                    document.getElementById('moodDescription').value = entry.description || '';
+                    document.getElementById('sleepHours').value = entry.sleepHours || '';
+                    document.getElementById('exerciseMinutes').value = entry.exerciseMinutes || '';
+                    document.getElementById('stressLevel').value = entry.stressLevel || '';
+                } else {
+                    showMessage('entryMessage', '', 'success'); // Clear any existing message
+                }
+            } catch (error) {
+                console.error('Error checking entry for selected date:', error);
+            }
+        }
+
+        async function saveMoodEntry() {
+            if (!selectedMood) {
+                showMessage('entryMessage', 'Please select a mood first!', 'error');
+                return;
+            }
+
+            const saveMoodBtn = document.getElementById('saveMoodBtn');
+            saveMoodBtn.disabled = true;
+            saveMoodBtn.textContent = 'Saving...';
+
+            const selectedDate = document.getElementById('entryDate').value || new Date().toISOString().split('T')[0];
+            
+            const moodData = {
+                date: selectedDate,
+                mood: selectedMood,
+                description: document.getElementById('moodDescription').value,
+                sleepHours: parseFloat(document.getElementById('sleepHours').value) || 0,
+                exerciseMinutes: parseInt(document.getElementById('exerciseMinutes').value) || 0,
+                stressLevel: parseInt(document.getElementById('stressLevel').value) || 5
+            };
+
+            try {
+                await apiCall('/mood/entry', 'POST', moodData);
+                showMessage('entryMessage', `Mood saved successfully for ${formatDate(selectedDate)}!`, 'success');
+                
+                // Reset form
+                resetMoodForm();
+                
+                // Refresh other tabs
+                loadMonthlyAnalysis();
+                loadMoodHistory();
+                loadMoodTrends();
+                
+            } catch (error) {
+                showMessage('entryMessage', 'Error saving mood: ' + error.message, 'error');
+            } finally {
+                saveMoodBtn.disabled = false;
+                saveMoodBtn.textContent = 'Save Mood Entry';
+            }
+        }
+
+        function resetMoodForm() {
+            selectedMood = null;
+            document.querySelectorAll('.mood-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            document.getElementById('moodDescription').value = '';
+            document.getElementById('sleepHours').value = '';
+            document.getElementById('exerciseMinutes').value = '';
+            document.getElementById('stressLevel').value = '';
+        }
+
+        // Initialize date picker with today's date and set up event listener
+        document.addEventListener('DOMContentLoaded', function() {
+            const entryDateInput = document.getElementById('entryDate');
+            if (entryDateInput) {
+                // Set default to today
+                entryDateInput.value = new Date().toISOString().split('T')[0];
+                
+                // Check for existing entry when date changes
+                entryDateInput.addEventListener('change', function() {
+                    checkTodayEntry();
+                    resetMoodForm(); // Clear form when date changes
+                });
+            }
+        });
+
+        // Load and display monthly analysis
+async function loadMonthlyAnalysis() {
+    try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1; // getMonth() returns 0-11
+        
+        console.log(`Loading analysis for ${year}/${month}`);
+        const response = await apiCall(`/mood/analysis/${year}/${month}`);
+        
+        displayAnalysis(response);
+    } catch (error) {
+        console.error('Error loading monthly analysis:', error);
+        const analysisTab = document.getElementById('analysisTab');
+        if (analysisTab) {
+            analysisTab.innerHTML = `
+                <div class="error-message">
+                    <h3>Error generating analysis</h3>
+                    <p>${error.message}</p>
+                    <button onclick="loadMonthlyAnalysis()" class="btn btn-primary">Try Again</button>
+                </div>
+            `;
+        }
+    }
+}
+
+// Display analysis results
+function displayAnalysis(data) {
+    const analysisTab = document.getElementById('analysisTab');
+    if (!analysisTab) return;
+    
+    if (data.message) {
+        // No data available
+        analysisTab.innerHTML = `
+            <div class="no-data-message">
+                <h3>No Analysis Available</h3>
+                <p>${data.message}</p>
+                <p>Start logging your moods to see insights!</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const { analysis, recommendations, chartData } = data;
+    
+    analysisTab.innerHTML = `
+        <h2>Monthly Analysis - ${data.period}</h2>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Average Mood</h3>
+                <div class="stat-value">${analysis.averageMood}/5</div>
+            </div>
+            <div class="stat-card">
+                <h3>Average Sleep</h3>
+                <div class="stat-value">${analysis.averageSleep}h</div>
+            </div>
+            <div class="stat-card">
+                <h3>Average Exercise</h3>
+                <div class="stat-value">${analysis.averageExercise}m</div>
+            </div>
+            <div class="stat-card">
+                <h3>Average Stress</h3>
+                <div class="stat-value">${analysis.averageStress}/10</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="analysisChart"></canvas>
+        </div>
+        
+        <div class="mood-distribution">
+            <h3>Mood Distribution</h3>
+            <div class="distribution-bars">
+                <div class="bar-item">
+                    <span>Very Sad</span>
+                    <div class="bar"><div class="fill" style="width: ${(analysis.moodDistribution.verySad / data.totalEntries) * 100}%"></div></div>
+                    <span>${analysis.moodDistribution.verySad}</span>
+                </div>
+                <div class="bar-item">
+                    <span>Sad</span>
+                    <div class="bar"><div class="fill" style="width: ${(analysis.moodDistribution.sad / data.totalEntries) * 100}%"></div></div>
+                    <span>${analysis.moodDistribution.sad}</span>
+                </div>
+                <div class="bar-item">
+                    <span>Neutral</span>
+                    <div class="bar"><div class="fill" style="width: ${(analysis.moodDistribution.neutral / data.totalEntries) * 100}%"></div></div>
+                    <span>${analysis.moodDistribution.neutral}</span>
+                </div>
+                <div class="bar-item">
+                    <span>Happy</span>
+                    <div class="bar"><div class="fill" style="width: ${(analysis.moodDistribution.happy / data.totalEntries) * 100}%"></div></div>
+                    <span>${analysis.moodDistribution.happy}</span>
+                </div>
+                <div class="bar-item">
+                    <span>Very Happy</span>
+                    <div class="bar"><div class="fill" style="width: ${(analysis.moodDistribution.veryHappy / data.totalEntries) * 100}%"></div></div>
+                    <span>${analysis.moodDistribution.veryHappy}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="recommendations">
+            <h3>Recommendations</h3>
+            ${recommendations.map(rec => `
+                <div class="recommendation-card priority-${rec.priority}">
+                    <h4>${rec.title}</h4>
+                    <p class="category">${rec.category}</p>
+                    <p>${rec.description}</p>
+                    <ul>
+                        ${rec.actionItems.map(item => `<li>${item}</li>`).join('')}
+                    </ul>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    // Create chart
+    createAnalysisChart(chartData);
+}
+
+// Load mood history
+async function loadMoodHistory() {
+    try {
+        console.log('Loading mood history...');
+        const response = await apiCall('/mood/entries?limit=50');
+        
+        displayMoodHistory(response);
+    } catch (error) {
+        console.error('Error loading mood history:', error);
+        const historyTab = document.getElementById('historyTab');
+        if (historyTab) {
+            historyTab.innerHTML = `
+                <div class="error-message">
+                    <h3>Error loading mood history</h3>
+                    <p>${error.message}</p>
+                    <button onclick="loadMoodHistory()" class="btn btn-primary">Try Again</button>
+                </div>
+            `;
+        }
+    }
+}
+
+// Display mood history
+function displayMoodHistory(entries) {
+    const historyTab = document.getElementById('historyTab');
+    if (!historyTab) return;
+    
+    if (!entries || entries.length === 0) {
+        historyTab.innerHTML = `
+            <div class="no-data-message">
+                <h3>No Mood History</h3>
+                <p>You haven't logged any moods yet. Start tracking to see your history!</p>
+            </div>
+        `;
+        return;
+    }
+    
+    historyTab.innerHTML = `
+        <h2>Your Mood Journey</h2>
+        <div class="history-list">
+            ${entries.map(entry => `
+                <div class="history-item">
+                    <div class="history-date">${formatDate(entry.date)}</div>
+                    <div class="history-mood">
+                        <span class="mood-emoji">${getMoodEmoji(entry.mood)}</span>
+                        <span class="mood-text">${getMoodText(entry.mood)}</span>
+                    </div>
+                    <div class="history-details">
+                        ${entry.description ? `<p><strong>Note:</strong> ${entry.description}</p>` : ''}
+                        <div class="mini-stats">
+                            <span>💤 ${entry.sleepHours}h</span>
+                            <span>🏃 ${entry.exerciseMinutes}m</span>
+                            <span>😰 ${entry.stressLevel}/10</span>
+                        </div>
+                    </div>
+                    <button onclick="deleteMoodEntry('${entry.date}')" class="delete-btn">🗑️</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// Load mood trends
+async function loadMoodTrends() {
+    try {
+        console.log('Loading mood trends...');
+        const response = await apiCall('/mood/trends?days=30');
+        
+        displayMoodTrends(response);
+    } catch (error) {
+        console.error('Error loading mood trends:', error);
+        const trendsTab = document.getElementById('trendsTab');
+        if (trendsTab) {
+            trendsTab.innerHTML = `
+                <div class="error-message">
+                    <h3>Error loading trends</h3>
+                    <p>${error.message}</p>
+                    <button onclick="loadMoodTrends()" class="btn btn-primary">Try Again</button>
+                </div>
+            `;
+        }
+    }
+}
+
+// Display mood trends
+function displayMoodTrends(data) {
+    const trendsTab = document.getElementById('trendsTab');
+    if (!trendsTab) return;
+    
+    if (!data.trends) {
+        trendsTab.innerHTML = `
+            <div class="no-data-message">
+                <h3>No Trends Available</h3>
+                <p>You need at least 8 days of mood data to see trends. Keep logging!</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const { trends } = data;
+    const trendIcon = trends.moodTrend === 'improving' ? '📈' : 
+                     trends.moodTrend === 'declining' ? '📉' : '➡️';
+    
+    trendsTab.innerHTML = `
+        <h2>Mood Trends & Insights</h2>
+        <div class="trend-summary">
+            <div class="trend-card">
+                <h3>${trendIcon} Mood Trend</h3>
+                <div class="trend-value">${trends.moodTrend}</div>
+                <p>Recent average: ${trends.recentAverage}</p>
+                <p>Previous average: ${trends.previousAverage}</p>
+                <p>Change: ${trends.changePercentage}%</p>
+            </div>
+        </div>
+        <p class="trend-period">${data.period} (${data.entries} entries)</p>
+    `;
+}
+
+// Helper functions
+function getMoodEmoji(mood) {
+    const emojis = ['😢', '😞', '😐', '🙂', '😄'];
+    return emojis[mood - 1] || '😐';
+}
+
+function getMoodText(mood) {
+    const texts = ['Very Sad', 'Sad', 'Neutral', 'Happy', 'Very Happy'];
+    return texts[mood - 1] || 'Unknown';
+}
+
+function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+    });
+}
+
+function createAnalysisChart(chartData) {
+    const ctx = document.getElementById('analysisChart');
+    if (!ctx || !chartData) return;
+    
+    if (moodChart) {
+        moodChart.destroy();
+    }
+    
+    moodChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.map(d => formatDate(d.date)),
+            datasets: [{
+                label: 'Mood',
+                data: chartData.map(d => d.mood),
+                borderColor: '#4CAF50',
+                backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Stress Level',
+                data: chartData.map(d => d.stressLevel),
+                borderColor: '#f44336',
+                backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 10
+                }
+            }
+        }
+    });
+}
+
+async function deleteMoodEntry(date) {
+    if (!confirm('Are you sure you want to delete this mood entry?')) return;
+    
+    try {
+        await apiCall(`/mood/entry/${date}`, 'DELETE');
+        loadMoodHistory(); // Refresh the list
+        showMessage('historyMessage', 'Mood entry deleted successfully!', 'success');
+    } catch (error) {
+        showMessage('historyMessage', 'Error deleting mood entry: ' + error.message, 'error');
+    }
+}
+
+// Also call these functions when user signs in
+// Update your auth state observer:
+auth.onAuthStateChanged(async (user) => {
+    if (user) {
+        currentUser = user;
+        authToken = await user.getIdToken();
+        
+        checkTodayEntry();
+        // Load initial data
+        loadMonthlyAnalysis();
+        loadMoodHistory();
+        loadMoodTrends();
+    } else {
+        currentUser = null;
+        authToken = null;
+        document.getElementById('authSection').style.display = 'block';
+        document.getElementById('appSection').style.display = 'none';
+    }
+});
+    </script>
+</body>
+</html>
