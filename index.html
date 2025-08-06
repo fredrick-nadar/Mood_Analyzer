@@ -353,6 +353,24 @@
             border: 1px solid #90cdf4;
         }
 
+        @media (max-width: 768px) {
+            .user-info {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 12px;
+            }
+            .user-info h2 {
+                margin-bottom: 12px;
+                text-align: left;
+            }
+            .user-info button {
+                align-self: center;
+                width: 100%;
+                margin-top: 8px;
+            }
+        }
+        
+
         .user-info h2 {
             color: #2b6cb0;
             font-size: 1.3rem;
@@ -683,18 +701,20 @@
             <h2>Welcome to MoodTracker</h2>
             <p>Please sign in to start tracking your mood journey</p>
             
-            <div class="form-group">
-                <label for="email">Email:</label>
-                <input type="email" id="email" placeholder="Enter your email" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="password">Password:</label>
-                <input type="password" id="password" placeholder="Enter your password" required>
-            </div>
-            
-            <button class="btn" id="signInBtn" onclick="signIn()">Sign In</button>
-            <button class="btn btn-secondary" id="signUpBtn" onclick="signUp()">Sign Up</button>
+            <form id="authForm" onsubmit="handleAuthSubmit(event)">
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" placeholder="Enter your email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                </div>
+                
+                <button type="button" class="btn" id="signInBtn" onclick="signIn()">Sign In</button>
+                <button type="button" class="btn btn-secondary" id="signUpBtn" onclick="signUp()">Sign Up</button>
+            </form>
             
             <div id="authMessage" class="alert" style="display: none;"></div>
         </div>
@@ -857,25 +877,42 @@
         let currentUser = null;
         let selectedMood = null;
         let moodChart = null;
+        let isAuthInitialized = false;
 
         // Authentication state observer
         auth.onAuthStateChanged(async (user) => {
-            if (user) {
+            console.log('Auth state changed:', user ? `User: ${user.email}` : 'No user');
+            
+            if (user && user !== currentUser) {
                 currentUser = user;
+                console.log('User signed in:', user.email);
                 
+                // Update UI
                 document.getElementById('authSection').classList.remove('active');
                 document.getElementById('appSection').classList.add('active');
                 document.getElementById('userEmail').textContent = user.email;
                 
-                checkTodayEntry();
-                // Load initial data
-                loadMonthlyAnalysis();
-                loadMoodHistory();
-                loadMoodTrends();
-            } else {
+                // Load data only once per sign-in
+                if (!isAuthInitialized) {
+                    isAuthInitialized = true;
+                    checkTodayEntry();
+                    loadMonthlyAnalysis();
+                    loadMoodHistory();
+                    loadMoodTrends();
+                }
+            } else if (!user && currentUser) {
+                console.log('User signed out');
                 currentUser = null;
+                isAuthInitialized = false;
+                
+                // Update UI
                 document.getElementById('appSection').classList.remove('active');
                 document.getElementById('authSection').classList.add('active');
+                
+                // Clear form
+                document.getElementById('email').value = '';
+                document.getElementById('password').value = '';
+                showMessage('authMessage', '', 'success'); // Clear any messages
             }
         });
 
@@ -951,6 +988,12 @@
         }
 
         // Authentication functions
+        function handleAuthSubmit(event) {
+            event.preventDefault();
+            // Default to sign in when Enter is pressed
+            signIn();
+        }
+
         async function signUp() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
@@ -963,9 +1006,12 @@
             setButtonLoading('signUpBtn', true);
             
             try {
-                await auth.createUserWithEmailAndPassword(email, password);
-                showMessage('authMessage', 'Account created successfully!', 'success');
+                console.log('Attempting to sign up:', email);
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                console.log('Sign up successful:', userCredential.user.email);
+                showMessage('authMessage', 'Account created successfully! Signing you in...', 'success');
             } catch (error) {
+                console.error('Sign up error:', error);
                 showMessage('authMessage', error.message, 'error');
             } finally {
                 setButtonLoading('signUpBtn', false);
@@ -984,8 +1030,12 @@
             setButtonLoading('signInBtn', true);
             
             try {
-                await auth.signInWithEmailAndPassword(email, password);
+                console.log('Attempting to sign in:', email);
+                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                console.log('Sign in successful:', userCredential.user.email);
+                showMessage('authMessage', 'Signed in successfully!', 'success');
             } catch (error) {
+                console.error('Sign in error:', error);
                 showMessage('authMessage', error.message, 'error');
             } finally {
                 setButtonLoading('signInBtn', false);
@@ -993,7 +1043,12 @@
         }
 
         function signOut() {
-            auth.signOut();
+            console.log('Signing out...');
+            auth.signOut().then(() => {
+                console.log('Sign out successful');
+            }).catch((error) => {
+                console.error('Sign out error:', error);
+            });
         }
 
         // UI Helper functions
@@ -1610,24 +1665,6 @@ function calculateTrends(entries) {
         changePercentage: (((recentAvg - olderAvg) / olderAvg) * 100).toFixed(1)
     };
 }
-
-// Also call these functions when user signs in
-// Update your auth state observer:
-auth.onAuthStateChanged(async (user) => {
-    if (user) {
-        currentUser = user;
-        
-        checkTodayEntry();
-        // Load initial data
-        loadMonthlyAnalysis();
-        loadMoodHistory();
-        loadMoodTrends();
-    } else {
-        currentUser = null;
-        document.getElementById('authSection').style.display = 'block';
-        document.getElementById('appSection').style.display = 'none';
-    }
-});
     </script>
 </body>
 </html>
