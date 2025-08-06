@@ -63,7 +63,12 @@ const authenticateToken = async (req, res, next) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'Server is running', 
+    timestamp: new Date().toISOString(),
+    version: '1.1.0',
+    cors: 'Updated for Netlify + Local Dev'
+  });
 });
 
 // Get user profile
